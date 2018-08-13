@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 from subprocess import check_output
+import sys
 
-
-def get_pid(name='vendscreen.com'):
+def get_pid(name):
     """
     Get the PID of a given process name via adb shell and ps
 
@@ -17,7 +17,7 @@ def get_pid(name='vendscreen.com'):
 
     for process in ps_list:
         if name in process:
-            pid = process.split()[0]
+            pid = process.split()[1]
             print "Found PID: {0} of process {1}".format(pid, name)
             return pid
 
@@ -29,15 +29,19 @@ def get_map(pid):
     Returns: List of tuples: (start_address, end_address, pathname)
     """
 
-    map_list = check_output(['adb', 'shell', 'cat', '/proc/' + pid + '/maps']).splitlines()
-
+    map_list = check_output(['adb', 'shell', 'su', '-c', 'cat', '/proc/' + str(pid) + '/maps']).splitlines()
+    #print map_list
     splitted_list = [map.split() for map in map_list]
+    splitted_list = list(filter(None, splitted_list))
+    #print splitted_list
     
     final_list = []
 
     for map in splitted_list:
-        start_addr = map[0].split('-')[0]
-        end_addr = map[0].split('-')[1]
+        #print map
+        memory_range = map[0].split('-')
+        start_addr = memory_range[0]
+        end_addr = memory_range[1]
 
         if len(map) == 6:
             path = map[5]
@@ -60,7 +64,7 @@ def search_memory(pid, start, end, string, ascii=True):
     else:
         search = '-u'
 
-    output = check_output(['adb', 'shell', '/data/dumptool', pid, start, end, '-s', search, string])
+    output = check_output(['adb', 'shell', '/data/local/tmp/dumptool', pid, start, end, '-s', search, string])
     if len(output) != 0:
         print "At memory range {0}-{1} in path {2}:".format(map[0], map[1], map[2])
         print output
@@ -74,24 +78,28 @@ def dump_to_file(pid, start, end, file="memdump"):
     Deletes the dumpfile on the device
 
     """
-    print check_output(['adb', 'shell', '/data/dumptool', pid, start, end, '-d', '/data/' + file])
+    print check_output(['adb', 'shell', '/data/local/tmp/dumptool', pid, start, end, '-d', '/data/local/tmp/' + file])
 
-    print check_output(['adb', 'pull', '/data/' + file])
+    print check_output(['adb', 'pull', '/data/local/tmp/' + file])
 
-    print check_output(['adb', 'shell', 'rm', '/data/' + file])
+    print check_output(['adb', 'shell', 'rm', '/data/local/tmp/' + file])
 
 
 if __name__ == "__main__":
     
-    SEARCH_STRING = "VendScreen"
-    pid = get_pid()
+    PID_NAME = "com.test"
+    SEARCH_STRING = "9460301" #0x905a4d #9460301
+    pid = get_pid(PID_NAME)
     
-    print "Searching ASCII strings"
-    for map in get_map(pid):
+    maps = get_map(pid)
+    #dump_to_file(pid, maps[0][0], maps[0][1])
+    
+    #print "Searching ASCII strings"
+    for map in maps:
         search_memory(pid, map[0], map[1], SEARCH_STRING)
 
-    print "Searching UTF-16 strings"
-    for map in get_map(pid):
+    #print "Searching UTF-16 strings"
+    for map in maps:
         search_memory(pid, map[0], map[1], SEARCH_STRING, ascii=False) 
 
 

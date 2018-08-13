@@ -4,6 +4,6 @@
 ndk-build
 
 # Push
-adb push libs/armeabi/dumptool /data
-adb push libs/armeabi/dumpmem /data
+adb push libs/armeabi/dumptool /data/local/tmp
+adb push libs/armeabi/dumpmem /data/local/tmp
 
